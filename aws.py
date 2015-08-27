@@ -1,23 +1,23 @@
 __author__ = 'townsley'
 import boto.ec2
+import time
 
 ec2 = boto.ec2.connect_to_region('us-west-2')
 reservation = ec2.run_instances(image_id='ami-29ebb519',
                                 key_name='devenv-key',
                                 instance_type='t2.micro',
                                 security_group_ids=['devenv-sg'])
+print("Reservation ID = ", reservation.id)
+instance = reservation.instances[0]
+while instance.state != "running":
+    print "Instance state is", instance.state, "..."
+    time.sleep(5)
+    instance.update()
+print "Instance state is", instance.state, "!"
+print "Instance ID is", instance.id
+print instance.public_dns_name
 
-print(ec2.get_all_instances())
-print(reservation)
-print(reservation.id)
+time.sleep(60)
 
-# Wait a minute or two while it boots
-for r in ec2.get_all_instances():
-    print(r)
-    if r.id == reservation.id:
-        reservations = ec2.get_all_instances(instance_ids=[reservation.id])
-        i = reservations[0].instances[0]
-        print(i.public_dns_name)
-        break
+ec2.terminate_instances(instance.id)
 
-print(r.instances[0].public_dns_name)
