@@ -5,17 +5,23 @@ import os
 import os.path
 
 region = 'us-west-2'
-ami = 'ami-29ebb519'
+amazon_linux_ami = 'ami-d5c5d1e5'
+rhel_ami = 'ami-4dbf9e7d'
+suse_ami = 'ami-d7450be7'
+ubuntu_ami = 'ami-5189a661'
+win_2012_r2_ami = 'ami-4dbcb67d'
 instance_type = 't2.micro'
 key_name = 'devenv_key'
 key_extension = '.pem'
 key_dir = '~/.ssh'
-security_group_id = 'devenv_sg'
+security_group_id = 'devenv-sg'
 ssh_port = 22
+http_port = 80
 cidr = '0.0.0.0/0'
 user_data = None
 cmd_shell  =True
-login_user = 'ubuntu'
+ubuntu_login = 'ubuntu'
+ec2_login = 'ec2_user'
 ssh_passwd = None
 
 ec2 = boto.ec2.connect_to_region(region)
@@ -42,7 +48,7 @@ except ec2.ResponseError, e:
         key.save(key_dir)
     else:
         raise
-print 'Key Pair', key_name, 'is available.'
+print 'Key Pair', key_name, 'is available'
 print
 
 try:
@@ -51,27 +57,24 @@ except ec2.ResponseError, e:
     if e.code == 'InvalidGroup.NotFound':
         print 'Creating Security Group: %s' % security_group_id
         # Create a security group to control access to instance via SSH.
-        group = ec2.create_security_group(security_group_id, 'group with ssh access')
+        group = ec2.create_security_group(security_group_id, 'group with ssh/http access')
     else:
         raise
-print 'Security Group', security_group_id, 'is available.'
+print 'Security Group', group, 'is available'
 print
 
-try:
-    group.authorize('tcp', ssh_port, ssh_port, cidr)
-except ec2.ResponseError, e:
-    if e.code == 'InvalidPermission.Duplicate':
-        print 'Security Group: %s already authorized' % security_group_id
-    else:
-        raise
-print 'Security group', security_group_id, 'authorized for:'
-print '\ttcp'
-print '\tssh'
-print '\tssh port', ssh_port
-print '\tcidr', cidr
-print
+for port in [ssh_port, http_port]:
+    try:
+        group.authorize('tcp', port, port, cidr)
+    except ec2.ResponseError, e:
+        if e.code == 'InvalidPermission.Duplicate':
+            print 'Security Group: %s already authorized for tcp port', port
+        else:
+            raise
+    print 'Security group %s authorized for tcp port', port
 
-reservation = ec2.run_instances(ami,
+
+reservation = ec2.run_instances(rhel_ami,
                                 key_name=key_name,
                                 security_groups=[security_group_id],
                                 instance_type=instance_type,
