@@ -3,97 +3,86 @@ import boto.ec2
 import time
 import os
 import os.path
+import yaml
 
-region = 'us-west-2'
-amazon_linux_ami = 'ami-d5c5d1e5'
-rhel_ami = 'ami-4dbf9e7d'
-suse_ami = 'ami-d7450be7'
-ubuntu_ami = 'ami-5189a661'
-win_2012_r2_ami = 'ami-4dbcb67d'
-instance_type = 't2.micro'
-key_name = 'devenv_key'
-key_extension = '.pem'
-key_dir = '~/.ssh'
-security_group_id = 'devenv-sg'
-ssh_port = 22
-http_port = 80
-cidr = '0.0.0.0/0'
-user_data = None
-cmd_shell  =True
-ubuntu_login = 'ubuntu'
-ec2_login = 'ec2_user'
-ssh_passwd = None
-
-ec2 = boto.ec2.connect_to_region(region)
-
-try:
-    key = ec2.get_all_key_pairs(keynames=[key_name])[0]
-except ec2.ResponseError, e:
-    if e.code == 'InvalidKeyPair.NotFound':
-        print 'Creating keypair: %s' % key_name
-        # Create an SSH key to use when logging into instances.
-        key = ec2.create_key_pair(key_name)
-
-        # Make sure the specified key_dir actually exists.
-        # If not, create it.
-        key_dir = os.path.expanduser(key_dir)
-        key_dir = os.path.expandvars(key_dir)
-        if not os.path.isdir(key_dir):
-            os.mkdir(key_dir, 0700)
-
-        # AWS will store the public key but the private key is
-        # generated and returned and needs to be stored locally.
-        # The save method will also chmod the file to protect
-        # your private key.
-        key.save(key_dir)
-    else:
-        raise
-print 'Key Pair', key_name, 'is available'
-print
-
-try:
-    group = ec2.get_all_security_groups(groupnames=[security_group_id])[0]
-except ec2.ResponseError, e:
-    if e.code == 'InvalidGroup.NotFound':
-        print 'Creating Security Group: %s' % security_group_id
-        # Create a security group to control access to instance via SSH.
-        group = ec2.create_security_group(security_group_id, 'group with ssh/http access')
-    else:
-        raise
-print 'Security Group', group, 'is available'
-print
-
-for port in [ssh_port, http_port]:
-    try:
-        group.authorize('tcp', port, port, cidr)
-    except ec2.ResponseError, e:
-        if e.code == 'InvalidPermission.Duplicate':
-            print 'Security Group: %s already authorized for tcp port', port
-        else:
-            raise
-    print 'Security group %s authorized for tcp port', port
+conf_file='./aws.yaml'
 
 
-reservation = ec2.run_instances(rhel_ami,
-                                key_name=key_name,
-                                security_groups=[security_group_id],
-                                instance_type=instance_type,
-                                user_data=user_data)
+def set_vars(conf=conf_file):
+    # global variable to hold config data
+    global c
+    with open(conf, 'r') as stream:
+        c = yaml.load(stream)
 
-print 'Reservation ID = ', reservation.id
-instance = reservation.instances[0]
-print 'Instance ID is', instance.id
-print
+    # massage key_dir to make it OS friendly
+    c['key_dir'] = os.path.expanduser(c['key_dir'])
+    c['key_dir'] = os.path.expandvars(c['key_dir'])
 
-while instance.state != 'running':
-    print 'Instance state is', instance.state, '...'
-    time.sleep(5)
-    instance.update()
-print 'Instance state is', instance.state
-print
 
-print 'Instance FQDN is', instance.public_dns_name
-print
+def create_instances(count=1):
+
+    ec2 = boto.ec2.connect_to_region(c['region'])
+
+    for i in range(0, count):
+
+        try:
+            key = ec2.get_all_key_pairs(keynames=[c['key_name']])[0]
+        except ec2.ResponseError, e:
+            if e.code == 'InvalidKeyPair.NotFound':
+                if c['debug']: print 'Creating keypair: %s' % c['key_name']
+                key = ec2.create_key_pair(c['key_name'])
+                
+                if not os.path.isdir(c['key_dir']):
+                    os.mkdir(c['key_dir'], 0700)
+
+                key.save(c['key_dir'])
+            else:
+                raise
+        if c['debug']: print 'Key Pair', key.name, 'is available'
+
+        try:
+            group = ec2.get_all_security_groups(groupnames=[c['sec_group_id']])[0]
+        except ec2.ResponseError, e:
+            if e.code == 'InvalidGroup.NotFound':
+                if c['debug']: print 'Creating Security Group: %s' % c['sec_group_id']
+
+                group = ec2.create_security_group(c['sec_group_id'], 'group with ssh/http access')
+            else:
+                raise
+        if c['debug']: print 'Security Group', group, 'is available'
+
+        for port in [c['ssh_port'], c['http_port']]:
+            try:
+                group.authorize('tcp', port, port, c['cidr'])
+            except ec2.ResponseError, e:
+                if e.code == 'InvalidPermission.Duplicate':
+                    if c['debug']: print 'Security Group: %s already authorized for tcp port', port
+                else:
+                    raise
+            if c['debug']: print 'Security group %s authorized for tcp port', port
+
+        reservation = ec2.run_instances(c['drupal_ami'],
+                                        key_name=c['key_name'],
+                                        security_groups=[c['sec_group_id']],
+                                        instance_type=c['instance_type'],
+                                        user_data=c['user_data'])
+
+        if c['debug']: print 'Reservation ID = ', reservation.id
+
+        instance = reservation.instances[0]
+        if c['debug']: print 'Instance ID is', instance.id
+
+        while instance.state != 'running':
+            if c['debug']: print 'Instance state is', instance.state, '...'
+            time.sleep(5)
+            instance.update()
+
+        ec2.create_tags([instance.id], {'Name': c['tag_name']})
+
+        if c['debug']: print 'Instance state is', instance.state
+        if c['debug']: print 'Instance FQDN is', instance.public_dns_name
+
+
 
 # ec2.terminate_instances(instance.id)
 # while instance.state != 'terminated':
@@ -101,5 +90,9 @@ print
 #     time.sleep(5)
 #     instance.update()
 # print 'Instance state is', instance.state, '!'
+
+if __name__ == "__main__":
+    set_vars()
+    create_instances()
 
 
