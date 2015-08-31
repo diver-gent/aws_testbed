@@ -56,30 +56,34 @@ def create_sec_group(ec2):
         if C['debug']: print 'Security group %s authorized for tcp port', port
 
 
-def create_instances(count=1):
+def create_instances(ec2, count=3):
 
-    ec2 = boto.ec2.connect_to_region(C['region'])
+    create_key_pair(ec2)
+    create_sec_group(ec2)
+    reservation = ec2.run_instances(C['drupal_ami'],
+                                    key_name=C['key_name'],
+                                    security_groups=[C['sec_group_id']],
+                                    instance_type=C['instance_type'],
+                                    user_data=C['user_data'],
+                                    max_count=count)
+    if C['debug']: print 'Reservation ID = ', reservation.id
 
-    for i in range(count):
-        create_key_pair(ec2)
-        create_sec_group(ec2)
-        reservation = ec2.run_instances(C['drupal_ami'],
-                                        key_name=C['key_name'],
-                                        security_groups=[C['sec_group_id']],
-                                        instance_type=C['instance_type'],
-                                        user_data=C['user_data'])
-        if C['debug']: print 'Reservation ID = ', reservation.id
+    instance = reservation.instances[0]
+    while instance.state != 'running':
+        if C['debug']: print 'Instance ID', instance.id, 'is', instance.state, '...'
+        time.sleep(5)
+        instance.update()
 
-        instance = reservation.instances[0]
-        while instance.state != 'running':
-            if C['debug']: print 'Instance ID', instance.id, 'is', instance.state, '...'
-            time.sleep(5)
-            instance.update()
+    ec2.create_tags(instance.id, {'Name': C['tag_name']})
 
-        ec2.create_tags(instance.id, {'Name': C['tag_name']})
+    if C['debug']: print 'Instance state is', instance.state
+    if C['debug']: print 'Instance FQDN is', instance.public_dns_name
 
-        if C['debug']: print 'Instance state is', instance.state
-        if C['debug']: print 'Instance FQDN is', instance.public_dns_name
+
+def print_instances(ec2, tag):
+    instances = ec2.get_all_instances(filters={'tag:Name':'drupal_node'})
+    for instance in instances:
+        print instance.id
 
 
 
@@ -92,6 +96,8 @@ def create_instances(count=1):
 
 if __name__ == "__main__":
     setup()
-    create_instances()
+    ec2 = boto.ec2.connect_to_region(C['region'])
+    create_instances(ec2)
+    print_instances(ec2, C['tag_name'])
 
 
