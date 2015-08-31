@@ -9,7 +9,7 @@ conf_file='./aws.yaml'
 
 
 def setup(conf=conf_file):
-    # global variable to hold config data
+    # global variable to hold config dict
     global C
     with open(conf, 'r') as stream:
         C = yaml.load(stream)
@@ -20,8 +20,13 @@ def setup(conf=conf_file):
     if not os.path.isdir(C['key_dir']):
                     os.mkdir(C['key_dir'], 0700)
 
+    # global variable for our AWS connection
+    global ec2
+    ec2 = boto.ec2.connect_to_region(C['region'])
+    return ec2
 
-def create_key_pair(ec2):
+
+def create_key_pair():
     try:
         key = ec2.get_all_key_pairs(keynames=[C['key_name']])[0]
     except ec2.ResponseError, e:
@@ -34,7 +39,7 @@ def create_key_pair(ec2):
     if C['debug']: print 'Key Pair', key.name, 'is available'
 
 
-def create_sec_group(ec2):
+def create_sec_group():
     try:
         group = ec2.get_all_security_groups(groupnames=[C['sec_group_id']])[0]
     except ec2.ResponseError, e:
@@ -56,10 +61,8 @@ def create_sec_group(ec2):
         if C['debug']: print 'Security group %s authorized for tcp port', port
 
 
-def create_instances(ec2, count=3):
+def create_instances(, count=1):
 
-    create_key_pair(ec2)
-    create_sec_group(ec2)
     reservation = ec2.run_instances(C['drupal_ami'],
                                     key_name=C['key_name'],
                                     security_groups=[C['sec_group_id']],
@@ -69,6 +72,7 @@ def create_instances(ec2, count=3):
     if C['debug']: print 'Reservation ID = ', reservation.id
 
     instance = reservation.instances[0]
+    # FIXME - THIS NEEDS TO BE A FOR LOOP RUNNING THRU INSTANCES!!
     while instance.state != 'running':
         if C['debug']: print 'Instance ID', instance.id, 'is', instance.state, '...'
         time.sleep(5)
@@ -80,8 +84,8 @@ def create_instances(ec2, count=3):
     if C['debug']: print 'Instance FQDN is', instance.public_dns_name
 
 
-def print_instances(ec2, tag):
-    instances = ec2.get_all_instances(filters={'tag:Name':'drupal_node'})
+def print_instances(tag):
+    instances = ec2.get_all_instances(filters={'tag:Name': tag})
     for instance in instances:
         print instance.id
 
@@ -95,9 +99,10 @@ def print_instances(ec2, tag):
 # print 'Instance state is', instance.state, '!'
 
 if __name__ == "__main__":
-    setup()
-    ec2 = boto.ec2.connect_to_region(C['region'])
-    create_instances(ec2)
-    print_instances(ec2, C['tag_name'])
+    ec2 = setup()
+    create_key_pair()
+    create_sec_group()
+    create_instances()
+    print_instances(C['tag_name'])
 
 
