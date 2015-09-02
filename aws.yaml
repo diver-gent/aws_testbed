@@ -4,7 +4,7 @@ drupal_ami        : ami-15e5f525
 amazon_linux_ami  : ami-d5c5d1e5
 rhel_ami          : ami-4dbf9e7d
 suse_ami          : ami-d7450be7
-ami               : rhel_mysql_drupal_ami
+ami               : ami-15e5f525
 ubuntu_ami        : ami-5189a661
 win_2012_r2_ami   : ami-4dbcb67d
 instance_type     : t2.micro

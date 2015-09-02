@@ -15,38 +15,42 @@ def load_conf(conf=conf_file):
         C = yaml.load(stream)
 
 
-def connect():
+def ec2_connect():
     # global variable for our AWS connection
-    global ec2
     ec2 = boto.ec2.connect_to_region(C['region'])
     return ec2
 
+def ec2_connect():
+    # global variable for our AWS connection
+    elb = boto.ec2.connect_to_region(C['region'])
+    return elb
 
-def create_key_pair():
+
+def create_key_pair(_ec2):
     # massage key_dir to make it OS friendly
     C['key_dir'] = os.path.expanduser(C['key_dir'])
     C['key_dir'] = os.path.expandvars(C['key_dir'])
     if not os.path.isdir(C['key_dir']):
-                    os.mkdir(C['key_dir'], 0700)
+        os.mkdir(C['key_dir'], 0o0700)
     try:
-        key = ec2.get_all_key_pairs(keynames=[C['key_name']])[0]
-    except ec2.ResponseError, e:
+        key = _ec2.get_all_key_pairs(keynames=[C['key_name']])[0]
+    except (_ec2.ResponseError) as e:
         if e.code == 'InvalidKeyPair.NotFound':
             if C['debug']: print 'Creating keypair: %s' % C['key_name']
-            key = ec2.create_key_pair(C['key_name'])
+            key = _ec2.create_key_pair(C['key_name'])
             key.save(C['key_dir'])
         else:
             raise
     if C['debug']: print 'Key Pair', key.name, 'is available'
 
 
-def create_sec_group():
+def create_sec_group(_ec2):
     try:
-        group = ec2.get_all_security_groups(groupnames=[C['sec_group_id']])[0]
-    except ec2.ResponseError, e:
+        group = _ec2.get_all_security_groups(groupnames=[C['sec_group_id']])[0]
+    except _ec2.ResponseError, e:
         if e.code == 'InvalidGroup.NotFound':
             if C['debug']: print 'Creating Security Group: %s' % C['sec_group_id']
-            group = ec2.create_security_group(C['sec_group_id'], 'group with ssh/http access')
+            group = _ec2.create_security_group(C['sec_group_id'], 'group with ssh/http access')
         else:
             raise
     if C['debug']: print 'Security Group', group, 'is available'
@@ -54,7 +58,7 @@ def create_sec_group():
     for port in [C['ssh_port'], C['http_port']]:
         try:
             group.authorize('tcp', port, port, C['cidr'])
-        except ec2.ResponseError, e:
+        except _ec2.ResponseError, e:
             if e.code == 'InvalidPermission.Duplicate':
                 if C['debug']: print 'Security Group: %s already authorized for tcp port', port
             else:
@@ -62,9 +66,9 @@ def create_sec_group():
         if C['debug']: print 'Security group %s authorized for tcp port', port
 
 
-def create_instances(count=1):
+def create_instances(_ec2, count=1):
 
-    reservation = ec2.run_instances(C['ami'],
+    reservation = _ec2.run_instances(C['ami'],
                                     key_name=C['key_name'],
                                     security_groups=[C['sec_group_id']],
                                     instance_type=C['instance_type'],
@@ -78,20 +82,20 @@ def create_instances(count=1):
             time.sleep(5)
             instance.update()
 
-        ec2.create_tags(instance.id, {'Name': C['tag_name']})
+        _ec2.create_tags(instance.id, {'Name': C['tag_name']})
 
         if C['debug']: print 'Instance state is', instance.state
         if C['debug']: print 'Instance FQDN is', instance.public_dns_name
 
 
-def terminate_instances_by_tag(tag):
+def terminate_instances_by_tag(_ec2, tag):
 
     instances = []
-    reservations = ec2.get_all_instances(filters={'tag:Name': tag, 'instance-state-name': 'running'})
+    reservations = _ec2.get_all_instances(filters={'tag:Name': tag, 'instance-state-name': 'running'})
     for reservation in reservations:
         for instance in reservation.instances:
             instances.append(instance.id)
-        ec2.terminate_instances(instances)
+        _ec2.terminate_instances(instances)
         for instance in reservation.instances:
             while instance.state != 'terminated':
                 if C['debug']: print 'Instance ID', instance.id, 'is', instance.state, '...'
@@ -102,10 +106,10 @@ def terminate_instances_by_tag(tag):
 
 if __name__ == "__main__":
     load_conf()
-    connect()
-    create_key_pair()
-    create_sec_group()
-    create_instances(5)
-    terminate_instances_by_tag(C['tag_name'])
+    ec2 = ec2_connect()
+    create_key_pair(ec2)
+    create_sec_group(ec2)
+    create_instances(ec2, 5)
+    terminate_instances_by_tag(ec2, C['tag_name'])
 
 
