@@ -108,7 +108,7 @@ if __name__ == "__main__":
     ec2 = ec2_connect()
     create_key_pair(ec2)
     create_sec_group(ec2)
-    create_instances(ec2, 5)
-    terminate_instances_by_tag(ec2, C['tag_name'])
+    create_instances(ec2, 1)
+    # terminate_instances_by_tag(ec2, C['tag_name'])
 
 
