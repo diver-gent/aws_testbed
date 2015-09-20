@@ -1,5 +1,7 @@
 __author__ = 'townsley'
 import boto.ec2
+import boto.ec2.elb
+from boto.ec2.elb import HealthCheck
 import time
 import os
 import os.path
@@ -21,9 +23,9 @@ def ec2_connect():
     return _ec2
 
 
-def ec2_connect():
+def elb_connect():
     # global variable for our AWS connection
-    _elb = boto.ec2.connect_to_region(C['region'])
+    _elb = boto.ec2.elb.connect_to_region(C['region'])
     return _elb
 
 
@@ -103,12 +105,36 @@ def terminate_instances_by_tag(_ec2, tag):
             if C['debug']: print('Instance', instance.id, 'is', instance.state)
 
 
+def create_health_check(_elb):
+    hc = HealthCheck(
+        interval=C['interval'],
+        healthy_threshold=C['healthy_threshold'],
+        unhealthy_threshold=C['unhealthy_threshold'],
+        target=C['elb_target']
+    )
+    return hc
+
+def create_load_balancer(_elb):
+    hc = create_health_check(_elb)
+    zones = [C['zonea'],C['zoneb']]
+    ports = [(80, 8080, 'http'), (443, 8443, 'tcp')]
+    lb = _elb.create_load_balancer('bt-elb', zones, ports)
+    lb.configure_health_check(hc)
+    print(lb.dns_name)
+
 if __name__ == "__main__":
     load_conf()
-    ec2 = ec2_connect()
-    create_key_pair(ec2)
-    create_sec_group(ec2)
-    create_instances(ec2, 1)
+
+    # EC2 INSTANCE BLOCK
+    # ec2 = ec2_connect()
+    # create_key_pair(ec2)
+    # create_sec_group(ec2)
+    # create_instances(ec2, 1)
     # terminate_instances_by_tag(ec2, C['tag_name'])
+
+    # ELB INSTANCE BLOCK
+    elb = elb_connect()
+    create_load_balancer(elb)
+
 
 
