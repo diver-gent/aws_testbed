@@ -144,8 +144,7 @@ def create_launch_config(_asg):
                              key_name=C['key_name'],
                              security_groups=[C['sec_group_id']])
     lcs = _asg.get_all_launch_configurations(names=[C['lc_name']])
-    print(lcs)
-    if C['lc_name'] not in lcs:
+    if len(lcs) == 0:
         _asg.create_launch_configuration(lc)
     return lc
 
@@ -162,7 +161,9 @@ def create_autoscale_group(_asg):
                           availability_zones=[C['zonea'],C['zoneb']],
                           launch_config=lc, min_size=C['asg_min'], max_size=C['asg_max'],
                           connection=_asg)
-    _asg.create_auto_scaling_group(ag)
+    ags = _asg.get_all_groups(names=[C['asg_name']])
+    if len(ags) == 0:
+        _asg.create_auto_scaling_group(ag)
     while [ True ]:
         ag.get_activities()
         time.sleep(5)
