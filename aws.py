@@ -1,6 +1,8 @@
 __author__ = 'townsley'
 import boto.ec2
 import boto.ec2.elb
+from boto.ec2.autoscale import LaunchConfiguration
+from boto.ec2.autoscale import AutoScalingGroup
 from boto.ec2.elb import HealthCheck
 import time
 import os
@@ -18,15 +20,18 @@ def load_conf(conf=conf_file):
 
 
 def ec2_connect():
-    # global variable for our AWS connection
     _ec2 = boto.ec2.connect_to_region(C['region'])
     return _ec2
 
 
 def elb_connect():
-    # global variable for our AWS connection
     _elb = boto.ec2.elb.connect_to_region(C['region'])
     return _elb
+
+
+def asg_connect():
+    _asg = boto.ec2.autoscale.connect_to_region(C['region'])
+    return _asg
 
 
 def create_key_pair(_ec2):
@@ -107,34 +112,85 @@ def terminate_instances_by_tag(_ec2, tag):
 
 def create_health_check(_elb):
     hc = HealthCheck(
-        interval=C['interval'],
+        interval=C['elb_interval'],
+        timeout=C['elb_timeout'],
         healthy_threshold=C['healthy_threshold'],
         unhealthy_threshold=C['unhealthy_threshold'],
         target=C['elb_target']
     )
     return hc
 
+
 def create_load_balancer(_elb):
+    lbs = _elb.get_all_load_balancers()
+    if C['elb_name'] in lbs:
+        return
     hc = create_health_check(_elb)
     zones = [C['zonea'],C['zoneb']]
     ports = [(80, 8080, 'http'), (443, 8443, 'tcp')]
-    lb = _elb.create_load_balancer('bt-elb', zones, ports)
+    lb = _elb.create_load_balancer(C['elb_name'], zones, ports)
     lb.configure_health_check(hc)
     print(lb.dns_name)
+
+
+def delete_load_balancer(_elb):
+    lbs = _elb.get_all_load_balancers()
+    if C['elb_name'] in lbs:
+        _elb.delete_load_balancer(C['elb_name'])
+
+
+def create_launch_config(_asg):
+    lc = LaunchConfiguration(name=C['lc_name'], image_id=C['ami'],
+                             key_name=C['key_name'],
+                             security_groups=[C['sec_group_id']])
+    lcs = _asg.get_all_launch_configurations(names=[C['lc_name']])
+    print(lcs)
+    if C['lc_name'] not in lcs:
+        _asg.create_launch_configuration(lc)
+    return lc
+
+
+def delete_launch_config(_asg):
+    lcs = _asg.get_all_launch_configurations()
+    if C['lc_name'] in lcs:
+        _asg.delete_launch_configuration(C['lc_name'])
+
+
+def create_autoscale_group(_asg):
+    lc = create_launch_config(_asg)
+    ag = AutoScalingGroup(group_name=C['asg_name'], load_balancers=[C['elb_name']],
+                          availability_zones=[C['zonea'],C['zoneb']],
+                          launch_config=lc, min_size=C['asg_min'], max_size=C['asg_max'],
+                          connection=_asg)
+    _asg.create_auto_scaling_group(ag)
+    while [ True ]:
+        ag.get_activities()
+        time.sleep(5)
+        print("mark")
+
+
+def delete_autoscale_group(_asg):
+    _asg.delete_auto_scaling_group(C['asg_name'])
 
 if __name__ == "__main__":
     load_conf()
 
-    # EC2 INSTANCE BLOCK
+    # EC2 BLOCK
     # ec2 = ec2_connect()
     # create_key_pair(ec2)
     # create_sec_group(ec2)
     # create_instances(ec2, 1)
     # terminate_instances_by_tag(ec2, C['tag_name'])
 
-    # ELB INSTANCE BLOCK
+    # ELB BLOCK
     elb = elb_connect()
     create_load_balancer(elb)
+    # delete_load_balancer(elb)
 
+    # ASG BLOCK
+    asg = asg_connect()
+    create_autoscale_group(asg)
+    # delete_autoscale_group(asg)
+    # delete_launch_config(asg)
 
 
