@@ -94,6 +94,8 @@ def create_instances(_ec2, count=1):
         if C['debug']: print('Instance state is', instance.state)
         if C['debug']: print('Instance FQDN is', instance.public_dns_name)
 
+    return reservation.instances
+
 
 def terminate_instances_by_tag(_ec2, tag):
     instances = []
@@ -131,11 +133,17 @@ def create_load_balancer(_elb):
     lb = _elb.create_load_balancer(C['elb_name'], zones, ports)
     lb.configure_health_check(hc)
     print(lb.dns_name)
+    return lb
 
 
+def lb_register_instances(_lb, _instances):
+    _lb.register_instances(_instances)
+
+
+# TODO: try catch this
 def delete_load_balancer(_elb):
-    lbs = _elb.get_all_load_balancers()
-    if C['elb_name'] in lbs:
+    lbs = _elb.get_all_load_balancers(load_balancer_names=[C['elb_name']])
+    if len(lbs) > 0:
         _elb.delete_load_balancer(C['elb_name'])
 
 
@@ -149,9 +157,10 @@ def create_launch_config(_asg):
     return lc
 
 
+# TODO: try catch this - exception if there isn't an LC with that name
 def delete_launch_config(_asg):
-    lcs = _asg.get_all_launch_configurations()
-    if C['lc_name'] in lcs:
+    lcs = _asg.get_all_launch_configurations(names=[C['lc_name']])
+    if len(lcs) > 0:
         _asg.delete_launch_configuration(C['lc_name'])
 
 
@@ -177,21 +186,22 @@ if __name__ == "__main__":
     load_conf()
 
     # EC2 BLOCK
-    # ec2 = ec2_connect()
+    ec2 = ec2_connect()
     # create_key_pair(ec2)
     # create_sec_group(ec2)
-    # create_instances(ec2, 1)
-    # terminate_instances_by_tag(ec2, C['tag_name'])
+    # instances = create_instances(ec2, 2)
+    terminate_instances_by_tag(ec2, C['tag_name'])
 
     # ELB BLOCK
-    elb = elb_connect()
-    create_load_balancer(elb)
+    # elb = elb_connect()
+    # lb = create_load_balancer(elb)
+    # lb_register_instances(lb, instances)
     # delete_load_balancer(elb)
 
     # ASG BLOCK
     asg = asg_connect()
-    create_autoscale_group(asg)
+    # create_autoscale_group(asg)
     # delete_autoscale_group(asg)
-    # delete_launch_config(asg)
+    delete_launch_config(asg)
 
 
