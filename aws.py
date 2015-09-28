@@ -137,7 +137,10 @@ def create_load_balancer(_elb):
 
 
 def lb_register_instances(_lb, _instances):
-    _lb.register_instances(_instances)
+    i_list=[]
+    for instance in instances:
+        i_list.append(instance.id)
+    _lb.register_instances(i_list)
 
 
 # TODO: try catch this
@@ -187,21 +190,21 @@ if __name__ == "__main__":
 
     # EC2 BLOCK
     ec2 = ec2_connect()
-    # create_key_pair(ec2)
-    # create_sec_group(ec2)
-    # instances = create_instances(ec2, 2)
-    terminate_instances_by_tag(ec2, C['tag_name'])
+    create_key_pair(ec2)
+    create_sec_group(ec2)
+    instances = create_instances(ec2, 2)
+    # terminate_instances_by_tag(ec2, C['tag_name'])
 
     # ELB BLOCK
-    # elb = elb_connect()
-    # lb = create_load_balancer(elb)
-    # lb_register_instances(lb, instances)
+    elb = elb_connect()
+    lb = create_load_balancer(elb)
+    lb_register_instances(lb, instances)
     # delete_load_balancer(elb)
 
     # ASG BLOCK
     asg = asg_connect()
-    # create_autoscale_group(asg)
+    create_autoscale_group(asg)
     # delete_autoscale_group(asg)
-    delete_launch_config(asg)
+    # delete_launch_config(asg)
 
 
