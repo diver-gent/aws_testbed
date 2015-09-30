@@ -99,6 +99,7 @@ def create_instances(_ec2, count=1):
 
 def terminate_instances_by_tag(_ec2):
     reservations = _ec2.get_all_instances(filters={'tag:Name': C['tag_name'], 'instance-state-name': 'running'})
+    instances = []
     for reservation in reservations:
         for instance in reservation.instances:
             instances.append(instance.id)
@@ -197,19 +198,19 @@ if __name__ == "__main__":
 
     # EC2 BLOCK
     ec2 = ec2_connect()
-    create_key_pair(ec2)
-    create_sec_group(ec2)
+    # create_key_pair(ec2)
+    # create_sec_group(ec2)
     instances = create_instances(ec2, 2)
 
     # ELB BLOCK
     elb = elb_connect()
-    lb = create_load_balancer(elb)
-    lb_register_instances(lb, instances)
+    # lb = create_load_balancer(elb)
+    # lb_register_instances(lb, instances)
 
     # ASG BLOCK
     asg = asg_connect()
-    create_autoscale_group(asg)
+    # create_autoscale_group(asg)
 
-    # scorched_earth(ec2, elb, asg)
+    scorched_earth(ec2, elb, asg)
 
 
