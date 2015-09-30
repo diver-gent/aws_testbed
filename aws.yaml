@@ -27,7 +27,7 @@ lc_name             : LcTest
 asg_min             : 2
 asg_max             : 2
 ssh_port            : 22
-http_port           : 80
+http_port           : 8080
 cidr                : 0.0.0.0/0
 user_data           : None
 cmd_shell           : True

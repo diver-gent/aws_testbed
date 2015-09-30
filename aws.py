@@ -97,9 +97,8 @@ def create_instances(_ec2, count=1):
     return reservation.instances
 
 
-def terminate_instances_by_tag(_ec2, tag):
-    instances = []
-    reservations = _ec2.get_all_instances(filters={'tag:Name': tag, 'instance-state-name': 'running'})
+def terminate_instances_by_tag(_ec2):
+    reservations = _ec2.get_all_instances(filters={'tag:Name': C['tag_name'], 'instance-state-name': 'running'})
     for reservation in reservations:
         for instance in reservation.instances:
             instances.append(instance.id)
@@ -185,6 +184,14 @@ def create_autoscale_group(_asg):
 def delete_autoscale_group(_asg):
     _asg.delete_auto_scaling_group(C['asg_name'])
 
+
+def scorched_earth(_ec2, _elb, _asg):
+    terminate_instances_by_tag(_ec2)
+    delete_load_balancer(_elb)
+    delete_autoscale_group(_asg)
+    delete_launch_config(_asg)
+
+
 if __name__ == "__main__":
     load_conf()
 
@@ -193,18 +200,16 @@ if __name__ == "__main__":
     create_key_pair(ec2)
     create_sec_group(ec2)
     instances = create_instances(ec2, 2)
-    # terminate_instances_by_tag(ec2, C['tag_name'])
 
     # ELB BLOCK
     elb = elb_connect()
     lb = create_load_balancer(elb)
     lb_register_instances(lb, instances)
-    # delete_load_balancer(elb)
 
     # ASG BLOCK
     asg = asg_connect()
     create_autoscale_group(asg)
-    # delete_autoscale_group(asg)
-    # delete_launch_config(asg)
+
+    # scorched_earth(ec2, elb, asg)
 
 
