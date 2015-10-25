@@ -11,10 +11,10 @@ ami                 : ami-15e5f525
 ubuntu_ami          : ami-5189a661
 win_2012_r2_ami     : ami-4dbcb67d
 elb_interval        : 30
-healthy_threshold   : 3
-unhealthy_threshold : 5
-elb_timeout         : 15
-elb_target          : HTTP:8080/test.html
+healthy_threshold   : 2
+unhealthy_threshold : 10
+elb_timeout         : 5
+elb_target          : HTTP:80/index.php
 instance_type       : t2.micro
 key_name            : devenv_key
 key_extension       : .pem
@@ -27,7 +27,7 @@ lc_name             : LcTest
 asg_min             : 2
 asg_max             : 2
 ssh_port            : 22
-http_port           : 8080
+http_port           : 80
 cidr                : 0.0.0.0/0
 user_data           : None
 cmd_shell           : True

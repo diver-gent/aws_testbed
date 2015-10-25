@@ -129,7 +129,7 @@ def create_load_balancer(_elb):
         return
     hc = create_health_check(_elb)
     zones = [C['zonea'],C['zoneb']]
-    ports = [(80, 8080, 'http'), (443, 8443, 'tcp')]
+    ports = [(80, 80, 'http'), (443, 443, 'tcp')]
     lb = _elb.create_load_balancer(C['elb_name'], zones, ports)
     lb.configure_health_check(hc)
     print(lb.dns_name)
@@ -143,7 +143,6 @@ def lb_register_instances(_lb, _instances):
     _lb.register_instances(i_list)
 
 
-# TODO: try catch this
 def delete_load_balancer(_elb):
     lbs = _elb.get_all_load_balancers(load_balancer_names=[C['elb_name']])
     if len(lbs) > 0:
@@ -160,7 +159,6 @@ def create_launch_config(_asg):
     return lc
 
 
-# TODO: try catch this - exception if there isn't an LC with that name
 def delete_launch_config(_asg):
     lcs = _asg.get_all_launch_configurations(names=[C['lc_name']])
     if len(lcs) > 0:
@@ -200,7 +198,7 @@ if __name__ == "__main__":
     ec2 = ec2_connect()
     # create_key_pair(ec2)
     # create_sec_group(ec2)
-    instances = create_instances(ec2, 2)
+    # instances = create_instances(ec2, 2)
 
     # ELB BLOCK
     elb = elb_connect()
