@@ -190,7 +190,6 @@ def scorched_earth(_ec2, _elb, _asg):
     delete_autoscale_group(_asg)
     delete_launch_config(_asg)
 
-
 if __name__ == "__main__":
     load_conf()
 
@@ -209,6 +208,6 @@ if __name__ == "__main__":
     asg = asg_connect()
     # create_autoscale_group(asg)
 
+    # REMOVE EVERYTHING
     scorched_earth(ec2, elb, asg)
-
 
